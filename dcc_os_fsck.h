@@ -9,20 +9,23 @@
 #include <linux/types.h>
 
 
-/* blocks containing superblock backups */
-
+/* 
+ * 	Blocks containing superblock backup
+ */
 #define SB_BACKUP_1K 	8193
 #define SB_BACKUP_2K 	16384
 #define SB_BACKUP_4K 	32768
 
+
 /*
- * Constants relative to the data blocks
+ * 	Constants relative to the data blocks
  */
 #define	EXT2_NDIR_BLOCKS		12
 #define	EXT2_IND_BLOCK			EXT2_NDIR_BLOCKS
 #define	EXT2_DIND_BLOCK			(EXT2_IND_BLOCK + 1)
 #define	EXT2_TIND_BLOCK			(EXT2_DIND_BLOCK + 1)
 #define	EXT2_N_BLOCKS			(EXT2_TIND_BLOCK + 1)
+
 
 struct ext2_group_desc
 {
@@ -90,6 +93,7 @@ struct ext2_inode {
 		} masix2;
 	} osd2;				/* OS dependent 2 */
 };
+
 
 struct ext2_super_block {
 	__le32	s_inodes_count;			/* Inodes count */
@@ -162,6 +166,7 @@ struct ext2_super_block {
  	__le32	s_first_meta_bg; 	/* First metablock block group */
 	__u32	s_reserved[190];	/* Padding to the end of the block */
 };
+
 
 struct ext2_dir_entry {
 	__le32	inode;			/* Inode number */

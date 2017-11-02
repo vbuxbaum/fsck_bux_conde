@@ -8,7 +8,7 @@ int block_size;
 
 
 struct ext2_super_block* 
-save_first_attack(const char* file_path){
+retrieve_sb_backup(const char* file_path) {
 
 	int img_fd;
 
@@ -16,8 +16,6 @@ save_first_attack(const char* file_path){
         printf("Falha ao Abrir o arquivo %s.\n", file_path);
         return NULL;
     }
-
-	int init_b_size = block_size;
 
 	int backups[3] = { SB_BACKUP_1K , SB_BACKUP_2K , SB_BACKUP_4K };
 
@@ -33,7 +31,7 @@ save_first_attack(const char* file_path){
 		block_size <<= 1;  
 	}
 	
-	printf("Reading super-block from device :\n Inodes count: %u \n Blocks count : %u \n Reserved blocks count   : %u \n Free blocks count: %u\n Creator OS : %u \n First non-reserved inode: %u \n Size of inode structure : %hu \n",
+	/*printf("Reading super-block from device :\n Inodes count: %u \n Blocks count : %u \n Reserved blocks count   : %u \n Free blocks count: %u\n Creator OS : %u \n First non-reserved inode: %u \n Size of inode structure : %hu \n",
 		   super->s_inodes_count,  
 	       super->s_blocks_count,
 	       super->s_r_blocks_count,     // reserved blocks count 
@@ -41,9 +39,27 @@ save_first_attack(const char* file_path){
 	       super->s_creator_os,
 	       super->s_first_ino,          // first non-reserved inode 
 	       super->s_inode_size);
- 
+ 	*/
 	close(img_fd);
+
 	return super;
+}
+
+int 
+fix_superblock(const char *file_path, struct ext2_super_block *sb_backup) {
+	
+	int img_fd;
+	if ((img_fd = open(file_path, O_WRONLY)) < 0){
+        printf("Falha ao Abrir o arquivo %s.\n", file_path);
+        return -1;
+    }
+
+    lseek(img_fd, BASE_OFFSET, SEEK_SET);
+	write(img_fd, sb_backup, sizeof(struct ext2_super_block));
+
+	close(img_fd);
+
+	return 0;
 }
 
 int main(int argc, char const *argv[])
@@ -56,11 +72,17 @@ int main(int argc, char const *argv[])
 
 	block_size = 1024;
 
-	save_first_attack(argv[1]);
+	/*  SOLVE FIRST ATTACK  */
+	struct ext2_super_block *sb_backup = retrieve_sb_backup(argv[1]);
+	fix_superblock(argv[1],sb_backup);
 
 
-	//lseek(img_fd, 1024 + block_size, SEEK_SET);
+	//find_inode_table();
+
+	//struct ext2_group_desc gd;
+	//lseek(img_fd, BASE_OFFSET + block_size, SEEK_SET);
 	//read(img_fd, &gd, sizeof(struct ext2_group_desc));
+
 
 
 
