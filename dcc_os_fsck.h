@@ -12,9 +12,9 @@
 /* 
  * 	Blocks containing superblock backup
  */
-#define SB_BACKUP_1K 	8193
-#define SB_BACKUP_2K 	16384
-#define SB_BACKUP_4K 	32768
+#define SB_BACKUP_1K 	8193	// when block_size is 1024
+#define SB_BACKUP_2K 	16384	// when block_size is 2048
+#define SB_BACKUP_4K 	32768	// when block_size is 4096
 
 
 /*

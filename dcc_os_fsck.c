@@ -1,10 +1,14 @@
 #include "dcc_os_fsck.h"
 
 int block_size;
+int group_size;
 
 /* location of the super-block in the first group */
 #define BASE_OFFSET 1024
 #define BLOCK_OFFSET(block) (BASE_OFFSET + (block-1)*block_size)
+
+// calcula onde está o início do grupo i
+#define GROUP_OFFSET(i) (BASE_OFFSET + i*group_size)
 
 
 struct ext2_super_block* 
@@ -62,6 +66,57 @@ fix_superblock(const char *file_path, struct ext2_super_block *sb_backup) {
 	return 0;
 }
 
+
+/*
+ * Passeia pelos descritores de grupo para tentar recuperar os endereços 
+ * das tabelas de inodes. 
+ */
+
+int* 
+find_inode_tables(const char *file_path, int group_count){
+	int img_fd;
+	if ((img_fd = open(file_path, O_RDONLY)) < 0){
+        printf("Falha ao Abrir o arquivo %s.\n", file_path);
+        return NULL;
+    }
+
+    struct ext2_group_desc gd;
+	//int *gd_blocks = malloc(group_count * sizeof(int));
+	int *inode_tables = malloc(group_count * sizeof(int));
+
+    for (int i = 0; i < group_count; ++i)
+	{
+		lseek(img_fd, GROUP_OFFSET(i) + block_size, SEEK_SET); // vai ao início do grupo e pula a cópia do superblock
+		read(img_fd, &gd, sizeof(struct ext2_group_desc)); // lê o descritor do grupo
+		inode_tables[i] = gd.bg_inode_table; // adiciona o endereço da tabela de inodes ao vetor
+		
+		// printf pra ter noção do que tá rolando :P
+		printf("%i %i %i %i\n", gd.bg_block_bitmap, gd.bg_inode_bitmap, gd.bg_inode_table, gd.bg_free_blocks_count);
+	}
+    
+    return inode_tables;
+}
+
+int*
+check_inodes(const char *file_path, int *inode_tables, int group_count){
+	int img_fd;
+	if ((img_fd = open(file_path, O_RDONLY)) < 0){
+        printf("Falha ao Abrir o arquivo %s.\n", file_path);
+        return NULL;
+    }
+
+    for (int i = 0; i < group_count; ++i)
+    {
+    	/* code */
+    }
+
+
+    close(img_fd);
+
+    return NULL;
+    // quando tiver os endereços das tabelas de inodes, passar por elas checkando falhas nos inodes
+}
+
 int main(int argc, char const *argv[])
 {
 	/* calculate number of block groups on the disk */
@@ -77,14 +132,13 @@ int main(int argc, char const *argv[])
 	fix_superblock(argv[1],sb_backup);
 
 
-	//find_inode_table();
+	int group_count = 1 + (sb_backup->s_blocks_count-1) / sb_backup->s_blocks_per_group;
+	
+	group_size = block_size * sb_backup->s_blocks_per_group;
 
-	//struct ext2_group_desc gd;
-	//lseek(img_fd, BASE_OFFSET + block_size, SEEK_SET);
-	//read(img_fd, &gd, sizeof(struct ext2_group_desc));
+	find_inode_tables(argv[1], group_count);
 
-
-
+	free(sb_backup);
 
 	return 0;
 }
