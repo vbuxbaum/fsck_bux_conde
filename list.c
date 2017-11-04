@@ -75,12 +75,12 @@ void removeInode(list* rA, int inode){
 }
 
 /* ---------------------------------------------------------------------*/
-int findBlockUsage(list* rA, int block){
+int isBlockUsed(list* rA, int block){
 	cell* aux = rA->head->next;
 	while(aux != NULL){
 		if (aux->block == block)
 		{
-			return aux->inode;
+			return 1;
 		}
 		aux = aux->next;
 	}

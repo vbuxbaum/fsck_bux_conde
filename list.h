@@ -1,5 +1,5 @@
-#ifndef FUNC_H_INCLUDED
-#define FUNC_H_INCLUDED
+#ifndef LIST_H_INCLUDED
+#define LIST_H_INCLUDED
 
 #include <stdlib.h>
 
@@ -27,7 +27,7 @@ void insert(list* rA, int inode, int block);
 
 void removeInode(list* rA, int inode);
 
-int findBlock(list* rA, int block);
+int isBlockUsed(list* rA, int block);
 
 
 #endif

@@ -102,8 +102,7 @@ find_inode_paths(const char *file_path, int group_count){
 			inode_paths[0][i] = -1;
 			inode_paths[1][i] = -1;
 		}
-
-		
+	
 		// printf pra ter noção do que tá rolando :P
 		printf("%i %i\n", inode_paths[0][i], inode_paths[1][i]);
 	}
@@ -112,25 +111,72 @@ find_inode_paths(const char *file_path, int group_count){
 }
 
 int*
-check_inodes(const char *file_path, int *inode_paths, int group_count){
+check_inodes(const char *file_path, int **inode_paths, int group_count, int inode_size){
+
 	int img_fd;
 	if ((img_fd = open(file_path, O_RDONLY)) < 0){
         printf("Falha ao Abrir o arquivo %s.\n", file_path);
         return NULL;
     }
 
-    for (int i = 0; i < group_count; ++i)
+    //int i_block[EXT2_N_BLOCKS]; // container p/ blocos do inode repetido
+    int bitmap[block_size];	// o bitmap tem block_size linhas de 32 bits
+    list inode_list;
+    newList(&inode_list); 
+
+    struct ext2_inode aux_inode;
+
+    for (int h = 0; h < group_count; ++h)
     {
-    	/* code */
+    	if (inode_paths[0][h] > 0) lseek(img_fd, inode_paths[0][h], SEEK_SET); // encontra o bitmap
+		else continue; 
+		
+		read(img_fd, bitmap, block_size * sizeof(int)); // copia o bitmap
+
+		for(int i = 0; i < block_size; ++i) //percorre cada linha do bitmap
+		{
+			for(int j = 0; j < 32; ++j) // verifica cada bit
+			{
+				if (!(bitmap[i] & (1 << j))) // se for diferente de zero = valido
+					continue;
+				else
+				{
+					lseek(img_fd, BLOCK_OFFSET(inode_paths[1][h])+ (i*31 + j)*inode_size, SEEK_SET); // encontra a tabela de inodes
+					read(img_fd, &aux_inode, sizeof(struct ext2_inode)); // copia os blocos do inode
+
+					//check if any of the EXT2_N_BLOCKS (plus double, triple tables)
+					//addresses are already on the list, if not, add them
+					for(int k = 0; k < EXT2_N_BLOCKS; ++k)
+					{
+						if (isBlockUsed(&inode_list, aux_inode.i_block[k]))
+						{
+							removeInode(&inode_list, i*31 + j); // removes inode from list
+							bitmap[i] &= !(1 << j);
+							break;
+							//remove_inode(j) //this function has to remove the jth entry from the inode table
+						}
+						else{
+							printf("%i\t%i\n", i*31 + j, aux_inode.i_block[k] );
+							insert(&inode_list, aux_inode.i_block[k], i*31 + j);
+						}
+					}
+
+				}
+			}
+		}
+
     }
 
-
+    freeList(&inode_list);
     close(img_fd);
 
     return NULL;
     // quando tiver os endereços das tabelas de inodes, passar por elas checkando falhas nos inodes
 }
 
+void interface(const char *file_path){
+	//
+}
 
 int main(int argc, char const *argv[])
 {
@@ -151,7 +197,9 @@ int main(int argc, char const *argv[])
 	
 	group_size = block_size * sb_backup->s_blocks_per_group;
 
-	find_inode_paths(argv[1], group_count);
+
+
+	check_inodes(argv[1], find_inode_paths(argv[1], group_count), group_count, sb_backup->s_inode_size);
 
 	free(sb_backup);
 
