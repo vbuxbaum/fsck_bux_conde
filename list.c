@@ -41,26 +41,22 @@ int emptyList(list* rA){
 /* ---------------------------------------------------------------------*/
 void insert(list* rA, int inode, int block){
 	cell* new = (cell*)malloc(sizeof(cell));
-	new->inode = inode;
-	new->block = block;
+	new->inode = inode; //printf("INSERE >> inode %i ", inode);
+	new->block = block; //printf("block %i \n", block);
 	new->prev = rA->head;
 	new->next = rA->head->next;
-
-	if (emptyList(rA) == 1)
-	{
-		rA->head->prev = new;
-	}else{
-		rA->head->next->prev = new;	
-	}
+	
 	rA->head->next = new;
+
+	//rA->head->next = new;
 	rA->size ++;
 }
 
 /* ---------------------------------------------------------------------*/
-void removeInode(list* rA, int inode){
+int removeTHIS(list* rA, int x){
 	cell* aux = rA->head->next;
 	while(aux != NULL){
-		if (aux->inode == inode)
+		if (aux->inode == x)
 		{
 			if (aux->next != NULL)
 			{
@@ -69,20 +65,34 @@ void removeInode(list* rA, int inode){
 			aux->prev->next = aux->next;
 			free(aux);
 			rA->size --;
-		}
-		aux = aux->next;
-	}
-}
-
-/* ---------------------------------------------------------------------*/
-int isBlockUsed(list* rA, int block){
-	cell* aux = rA->head->next;
-	while(aux != NULL){
-		if (aux->block == block)
-		{
 			return 1;
 		}
 		aux = aux->next;
 	}
+	return 0;
+}
+
+void removeInode(list* rA, int inode){
+	cell* aux = rA->head->next;
+	while(removeTHIS(rA, inode)){}
+	
+	
+}
+
+/* ---------------------------------------------------------------------*/
+int isBlockUsed(list* rA, int block){
+
+	cell* aux = rA->head->next;
+	while(aux != NULL){
+		if (aux->block == block)
+		{
+			//printf("jimabalaia + %i %i \n" ,aux->inode , block);
+			//printf("\n----%i %i----\n", aux->inode, block);
+			return aux->inode;
+		}
+		//printf("yupi %i\n", aux->block);
+		aux = aux->next;
+	}
+	//printf("not on list %i \n", block);
 	return 0;
 }

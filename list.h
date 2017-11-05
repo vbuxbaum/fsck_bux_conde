@@ -2,6 +2,7 @@
 #define LIST_H_INCLUDED
 
 #include <stdlib.h>
+#include <stdio.h>
 
 typedef struct cell /* celula da lista*/
 {

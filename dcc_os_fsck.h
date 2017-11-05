@@ -26,6 +26,8 @@
 #define	EXT2_TIND_BLOCK			(EXT2_DIND_BLOCK + 1)
 #define	EXT2_N_BLOCKS			(EXT2_TIND_BLOCK + 1)
 
+#define EXT2_NAME_LEN 			255
+
 
 struct ext2_group_desc
 {
@@ -172,5 +174,13 @@ struct ext2_dir_entry {
 	__le32	inode;			/* Inode number */
 	__le16	rec_len;		/* Directory entry length */
 	__le16	name_len;		/* Name length */
-	char	name[];			/* File name, up to EXT2_NAME_LEN */
+	char	name[EXT2_NAME_LEN];			/* File name, up to EXT2_NAME_LEN */
+};
+
+struct ext2_dir_entry_2 {
+	__le32	inode;			/* Inode number */
+	__le16	rec_len;		/* Directory entry length */
+	__u8	name_len;		/* Name length */
+	__u8	file_type;
+	char	name[EXT2_NAME_LEN];			/* File name, up to EXT2_NAME_LEN */
 };
