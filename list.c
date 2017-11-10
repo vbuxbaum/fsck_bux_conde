@@ -75,8 +75,6 @@ int removeTHIS(list* rA, int x){
 void removeInode(list* rA, int inode){
 	cell* aux = rA->head->next;
 	while(removeTHIS(rA, inode)){}
-	
-	
 }
 
 /* ---------------------------------------------------------------------*/
@@ -84,8 +82,7 @@ int isBlockUsed(list* rA, int block){
 
 	cell* aux = rA->head->next;
 	while(aux != NULL){
-		if (aux->block == block)
-		{
+		if (aux->block == block) {
 			//printf("jimabalaia + %i %i \n" ,aux->inode , block);
 			//printf("\n----%i %i----\n", aux->inode, block);
 			return aux->inode;
@@ -94,5 +91,28 @@ int isBlockUsed(list* rA, int block){
 		aux = aux->next;
 	}
 	//printf("not on list %i \n", block);
+	return 0;
+}
+
+/* ---------------------------------------------------------------------*/
+int isInodeAlive(list* rA, int inode){
+
+	cell* aux = rA->head->next;
+	while(aux != NULL){
+		if (aux->inode == inode) {
+			return aux->block;
+		}
+		aux = aux->next;
+	}
+	return 0;
+}
+
+/* ---------------------------------------------------------------------*/
+int printList(list* rA){
+	cell* aux = rA->head->next;
+	while(aux != NULL){
+		printf("%i \t%i \n",aux->inode, aux->block );
+		aux = aux->next;
+	}
 	return 0;
 }

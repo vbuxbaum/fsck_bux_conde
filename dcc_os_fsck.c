@@ -106,23 +106,43 @@ read_gdtable(const char *file_path, int group_count){
     return gd_table;
 }
 
+char *
+read_i_bitmap(int img_fd, int i_bitmap_blk){
+	unsigned char *bitmap = malloc(_block_size);
+
+	lseek(img_fd, BLOCK_OFFSET(i_bitmap_blk), SEEK_SET);
+	read(img_fd, bitmap, _block_size);
+
+	return bitmap;
+}
+
+
+char *
+write_i_bitmap(int img_fd, unsigned char *bitmap, int i_bitmap_blk){
+	lseek(img_fd, BLOCK_OFFSET(i_bitmap_blk), SEEK_SET);
+	write(img_fd, bitmap, _block_size);
+}
 /* -------------------------------------------------------
 check_i_bitmap :
 	> retorna o INDICE do inode no bitmap, caso esteja ATIVO
 	> retorna ZERO se inode NÃO ESTIVER ATIVO 
 */
-int 
+unsigned int 
 check_i_bitmap(int i_n, unsigned char *bitmap, int i_per_grp) {
-	int index = (i_n-1)%i_per_grp;
+	unsigned int index = (i_n-1)%i_per_grp;
 
 	int i = index/8;
 	int j = index%8;
 
-	return (bitmap[i] & (1 << j)) ? index : 0;
+	//printf("%i\n", bitmap[i] & (1 << j));
+
+	//printf("%i\n", bitmap[i]);
+
+	return (bitmap[i] & (1 << j)) > 0 ? index : 0;
 }
 
 struct ext2_inode *
-read_inode(int img_fd, int i_index, int i_table_blk ){
+read_inode(int img_fd, unsigned int i_index, int i_table_blk ){
 	struct ext2_inode *inode = malloc(sizeof(struct ext2_inode)) ;
 
 	lseek(img_fd, BLOCK_OFFSET(i_table_blk) + i_index*sizeof(struct ext2_inode), SEEK_SET);
@@ -132,17 +152,21 @@ read_inode(int img_fd, int i_index, int i_table_blk ){
 } 
 
 void
-write_inode(int img_fd, struct ext2_inode *inode, int i_index, int i_table_blk ){
+write_inode(int img_fd, struct ext2_inode *inode, unsigned int i_index, int i_table_blk ){
 	lseek(img_fd, BLOCK_OFFSET(i_table_blk) + i_index*sizeof(struct ext2_inode), SEEK_SET);
 	write(img_fd, inode, sizeof(struct ext2_inode));
 } 
 
 void 
-delete_inode(int img_fd, int index, unsigned char *bitmap, int i_bitmap_blk){
-	int i = index/8;
-	int j = index%8;
+delete_inode(int img_fd, unsigned int index, unsigned char *bitmap, int i_bitmap_blk){
+	unsigned int i = index/8;
+	unsigned int j = index%8;
 
-	bitmap[i] |= !(1 << j);
+ 	//printf("\nJ%i %i\n", bitmap[i], (int)pow(2,j));
+
+	bitmap[i] -= (int)pow(2,j);
+
+	//printf("k%i\n", bitmap[i]);
 	
 	lseek(img_fd, BLOCK_OFFSET(i_bitmap_blk), SEEK_SET);     	// acha local do bitmap
 	write(img_fd, bitmap, _block_size); // escreve novo bitmap no arquivo
@@ -225,12 +249,120 @@ check_inode(int img_fd, int i_n, struct ext2_inode *inode, list *i_b_list){
 	return (inode->i_mode == 0) ? 0 : i_n;
 }
 
-/*
-
-					~~~~~~~~~~~~~~~~~
-					S O M E T H I N G 
-					~~~~~~~~~~~~~~~~~
+/* -------------------------------------------------------
+check_ind_dir entry :
+	> retorna o numero do outro Inode, caso um bloco já esteja usado
+	> retorna ZERO se estiver TUDO OK 
 */
+/*int 
+check_ind_dir_entry(int img_fd, int i_n, int level, int ind_block_addr, list *i_b_list, int *blk_cnt){
+	int links_per_block = _block_size/sizeof(struct ext2_dir_entry_2);
+	struct ext2_dir_entry_2 *ind_block = malloc(_block_size);
+
+	lseek(img_fd, BLOCK_OFFSET(ind_block_addr),SEEK_SET);
+	read(img_fd, ind_block, _block_size);
+
+	for (int i = 0; i < links_per_block; ++i)
+	{
+		if (ind_block[i].inode == 0) { continue; }
+
+		if (level > 1) {
+			int result = check_ind_blocks(img_fd, i_n, level-1, ind_block[i], i_b_list, blk_cnt);
+			if (result)	{ return result; }
+				else	{ continue;	}
+		}
+
+		int blk_used = isInodeAlive(i_b_list, ind_block[i]->inode);
+		if ((blk_used != (i_n)) && (blk_used != 0)) {// quando inode usa bloco já utilizado por outro inode
+			return blk_used;
+		} 
+
+		*blk_cnt ++;
+		insert(i_b_list, i_n, ind_block[i]);
+	}
+
+	return 0;
+}*/
+
+
+int 
+check_dir(int img_fd, int i_n, list *i_found_list, struct ext2_group_desc *gd_table, struct ext2_super_block *super) {
+	int index = (i_n-1)%super->s_inodes_per_group;
+	int grp   = (i_n-1)/super->s_inodes_per_group;
+
+	
+
+	struct ext2_inode *inode = read_inode(img_fd, index, gd_table[grp].bg_inode_table);
+
+	//int dir_ents*;
+	
+	for(int i = 0; i < EXT2_N_BLOCKS; ++i) {	// passeia pelas entradas do diretório					
+		
+		if (inode->i_block[i] == 0) continue;
+
+		// if (i == EXT2_IND_BLOCK) { 
+		// 	dir_ents = check_ind_dir_entry(img_fd, i_n, 1, inode->i_block[i], i_b_list, &blk_cnt); 
+		// 	continue;
+		// } if (i == EXT2_DIND_BLOCK){
+		// 	dir_ents = check_ind_dir_entry(img_fd, i_n, 2, inode->i_block[i], i_b_list, &blk_cnt);
+		// 	continue;
+		// } if (i == EXT2_TIND_BLOCK) {
+		// 	dir_ents = check_ind_dir_entry(img_fd, i_n, 3, inode->i_block[i], i_b_list, &blk_cnt);
+		// 	continue;
+		// } 
+
+		struct ext2_dir_entry_2 *dir_entry;
+		unsigned int size = 0;
+		unsigned char block[_block_size];
+
+		lseek(img_fd, BLOCK_OFFSET(inode->i_block[i]), SEEK_SET); // encontra a entrada do diretório
+		read(img_fd, block, _block_size); // copia os dados da entrada do diretório
+		
+		dir_entry = (struct ext2_dir_entry_2 *) block;           // first entry in the directory 
+
+		int count = 0;
+		
+		while(size < inode->i_size && dir_entry->inode > 0) {
+
+	        char file_name[EXT2_NAME_LEN+1];
+	        memcpy(file_name, dir_entry->name, dir_entry->name_len);
+	        file_name[dir_entry->name_len] = 0;              /* append null char to the file name */
+	        printf("%10u %s %i\n", dir_entry->inode, file_name, inode->i_size);
+
+	        grp = (dir_entry->inode-1)/super->s_inodes_per_group;
+	        unsigned char *bitmap = read_i_bitmap(img_fd, gd_table[grp].bg_inode_bitmap);
+
+	        if (!check_i_bitmap(dir_entry->inode, bitmap, super->s_inodes_per_group)) {
+	        	printf("SAFADO\n");
+	        	break;
+	        }
+
+	        if (isInodeAlive(i_found_list, dir_entry->inode) == -1) { // inode foi deletado no caminho
+	        	dir_entry->name_len = 0;
+
+	        	lseek(img_fd, BLOCK_OFFSET(inode->i_block[i]) + size, SEEK_SET); // encontra a entrada do diretório
+				write(img_fd, dir_entry, dir_entry->rec_len); // copia os dados para entrada do diretório
+
+				printf("DEFUNTO\n");
+
+	        	removeInode(i_found_list, dir_entry->inode);
+	        } else if (isInodeAlive(i_found_list, dir_entry->inode) == 1)
+	        {
+	        	/* code */
+	        }
+
+	        if ((dir_entry->file_type & 2) && count > 4)
+	        {
+	        	//check_dir(img_fd, dir_entry->inode, i_found_list, )
+	        }
+	        dir_entry = (void*) dir_entry + dir_entry->rec_len;      /* move to the next entry */
+	        size += dir_entry->rec_len; 
+	        count ++;
+		}
+	}
+}
+
+
 
 int main(int argc, char const *argv[])
 {
@@ -276,23 +408,22 @@ int main(int argc, char const *argv[])
 	    list i_b_list; // LISTA PARA AUXILIAR CHECKAGEM POR BLOCOS DE MAIS DE UM DONO
     	newList(&i_b_list);
 
-    	list i_found_list; // LISTA PARA REGISTRAR OS INODES ENCONTRADOS NA VARREDURA
+    	list i_found_list; // LISTA PARA REGISTRAR OS INODES ENCONTRADOS NA 1ª VARREDURA
     	newList(&i_found_list);
 
     	printf("\n> > > Conferindo inodes . . .\n\n");
 
-	    printf("inode\tblocks\tsize\n");
+	    //printf("inode\tblocks\tsize\n");
 		
 		for (int i_n = superblock->s_first_ino; i_n < superblock->s_inodes_count; ++i_n) {
 
 			int grp = (i_n - 1)/superblock->s_inodes_per_group;
 
-			unsigned char bitmap[_block_size];
+			unsigned char *bitmap = read_i_bitmap(img_fd, gd_table[grp].bg_inode_bitmap);
 
-			lseek(img_fd, BLOCK_OFFSET(gd_table[grp].bg_inode_bitmap), SEEK_SET);
-			read(img_fd, bitmap, _block_size);
+			
 
-			int index = check_i_bitmap(i_n, bitmap, superblock->s_inodes_per_group);
+			unsigned int index = check_i_bitmap(i_n, bitmap, superblock->s_inodes_per_group);
 
 			if ( index > 0) {
 				struct ext2_inode *inode = read_inode(img_fd, index, gd_table[grp].bg_inode_table);				
@@ -301,7 +432,7 @@ int main(int argc, char const *argv[])
 				int check_result = check_inode(img_fd, i_n, inode, &i_b_list);
 
 				if ( check_result == i_n ){
-					printf("i_node %i ok\n", i_n);
+					//printf("i_node %i ok\n", i_n);
 					insert(&i_found_list, i_n, 1);
 					// ADICIONAR À LISTA DE INODES ENCONTRADOS, COM BLOCO = 1 
 
@@ -326,8 +457,16 @@ int main(int argc, char const *argv[])
 					char c_opt; scanf(" %c",&c_opt);
 
 					if (c_opt == 's' || c_opt == 'S') { // remove inode da lista e do bitmap
-						delete_inode(img_fd, index  , bitmap , gd_table[grp].bg_inode_bitmap); 	// remove inode do bitmap e atualiza bitmap
+						delete_inode(img_fd, index, bitmap, gd_table[grp].bg_inode_bitmap); 	// remove inode do bitmap e atualiza bitmap
 						removeInode(&i_b_list, i_n); 					// remove inode da lista
+
+						inode->i_links_count = 0;
+						inode->i_mode = 0;
+						inode->i_dtime = (int)time(NULL);
+						printf("\n> > i_dtime %i. \n", inode->i_dtime);
+
+						write_inode(img_fd, inode, index, gd_table[grp].bg_inode_table);
+						//write_i_bitmap(img_fd, bitmap, )
 
 						printf("> > Inode %i REMOVIDO\n\n", i_n);
 
@@ -339,10 +478,17 @@ int main(int argc, char const *argv[])
 				}
 
 			} else { /* inode zerado no bitmap */ }
+		} // FIM DO LOOP DE VARREDURA DE INODES
 
-		} // FIM DO LOOP
+		//printList(&i_found_list);
 
-		// NOVO LOOP PARA VARREDURA DOS DIRETÓRIOS
+
+		// LOOP PARA VARREDURA DE DIRETÓRIOS
+		//check_dir(img_fd, 2, &i_found_list, gd_table, superblock); // INODE 2 RESERVADO PARA DIRETÓRIO ROOT
+		printf("\n> > > FIM\n");
+
+		close(img_fd);
+		
 
 		
 

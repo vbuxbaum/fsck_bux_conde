@@ -30,5 +30,9 @@ void removeInode(list* rA, int inode);
 
 int isBlockUsed(list* rA, int block);
 
+int isInodeAlive(list* rA, int inode);
+
+int printList(list* rA);
+
 
 #endif
